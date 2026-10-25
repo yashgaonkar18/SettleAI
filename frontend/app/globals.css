@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-google-sans), sans-serif;
+}
+
+@layer base {
+  :root {
+    --paypal-dark-blue: #003087;
+    --paypal-blue: #0070ba;
+    --paypal-light-blue: #00457c;
+    --paypal-cyan: #00c2ff;
+    --paypal-accent: #ffc439;
+  }
+
+  body {
+    background-color: #f8fafc;
+    color: #0f172a;
+    font-family: var(--font-google-sans), sans-serif;
+    overflow-x: hidden;
+  }
+}
+
+/* Custom subtle animations */
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes floatReverse {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(8px); }
+}
+
+.animate-float {
+  animation: floatSlow 4s ease-in-out infinite;
+}
+
+.animate-float-reverse {
+  animation: floatReverse 5s ease-in-out infinite;
+}
