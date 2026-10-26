@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import {
   ArrowDownToLine,
@@ -12,135 +12,12 @@ import {
   Plus,
   Search,
   Wallet,
+  Loader2,
 } from "lucide-react";
 
 import InvoiceTable from "@/components/dashboard/InvoiceTable";
 import type { Invoice } from "@/components/dashboard/types";
-
-const initialInvoices: Invoice[] = [
-  {
-    id: "inv-1",
-    invoiceNumber: "INV-2026-001",
-    clientName: "Acme Corp",
-    clientEmail: "billing@acme.com",
-    amount: 1200,
-    dueDate: "2026-10-14",
-    daysLate: 9,
-    status: "overdue",
-    lineItems: [
-      {
-        id: "l1",
-        description: "Brand Identity & Design System",
-        quantity: 1,
-        rate: 1200,
-        amount: 1200,
-      },
-    ],
-    paymentLink: "https://sandbox.paypal.com/checkout/ord_acme1200",
-    createdAt: "2026-09-30",
-  },
-  {
-    id: "inv-2",
-    invoiceNumber: "INV-2026-002",
-    clientName: "Nova Studio",
-    clientEmail: "payments@novastudio.design",
-    amount: 270,
-    dueDate: "2026-10-19",
-    daysLate: 4,
-    status: "overdue",
-    lineItems: [
-      {
-        id: "l2",
-        description: "Design Consultation",
-        quantity: 3,
-        rate: 90,
-        amount: 270,
-      },
-    ],
-    paymentLink: "https://sandbox.paypal.com/checkout/ord_nova270",
-    createdAt: "2026-10-05",
-  },
-  {
-    id: "inv-3",
-    invoiceNumber: "INV-2026-003",
-    clientName: "Pixel Craft",
-    clientEmail: "finance@pixelcraft.co",
-    amount: 2400,
-    dueDate: "2026-10-28",
-    status: "sent",
-    lineItems: [
-      {
-        id: "l3",
-        description: "Fullstack Dashboard UI sprint",
-        quantity: 1,
-        rate: 2400,
-        amount: 2400,
-      },
-    ],
-    paymentLink: "https://sandbox.paypal.com/checkout/ord_pixel2400",
-    createdAt: "2026-10-14",
-  },
-  {
-    id: "inv-4",
-    invoiceNumber: "INV-2026-004",
-    clientName: "Stripe Devs",
-    clientEmail: "ops@stripedevs.com",
-    amount: 1800,
-    dueDate: "2026-11-04",
-    status: "sent",
-    lineItems: [
-      {
-        id: "l4",
-        description: "Webhooks Integration Architecture",
-        quantity: 1,
-        rate: 1800,
-        amount: 1800,
-      },
-    ],
-    paymentLink: "https://sandbox.paypal.com/checkout/ord_stripe1800",
-    createdAt: "2026-10-20",
-  },
-  {
-    id: "inv-5",
-    invoiceNumber: "INV-2026-005",
-    clientName: "Apex Labs",
-    clientEmail: "accounts@apexlabs.ai",
-    amount: 4950,
-    dueDate: "2026-10-21",
-    status: "paid",
-    lineItems: [
-      {
-        id: "l5",
-        description: "Gemini Model Fine-Tuning Pipeline",
-        quantity: 1,
-        rate: 4950,
-        amount: 4950,
-      },
-    ],
-    paymentLink: "https://sandbox.paypal.com/checkout/ord_apex4950",
-    createdAt: "2026-10-07",
-  },
-  {
-    id: "inv-6",
-    invoiceNumber: "INV-2026-006",
-    clientName: "Horizon Media",
-    clientEmail: "billing@horizonmedia.io",
-    amount: 3500,
-    dueDate: "2026-10-15",
-    status: "paid",
-    lineItems: [
-      {
-        id: "l6",
-        description: "Monthly Growth Retainer",
-        quantity: 1,
-        rate: 3500,
-        amount: 3500,
-      },
-    ],
-    paymentLink: "https://sandbox.paypal.com/checkout/ord_horizon3500",
-    createdAt: "2026-10-01",
-  },
-];
+import { fetchInvoices, updateInvoiceStatus, generateReminderDraft } from "@/lib/api";
 
 const money = (amount: number) =>
   `$${amount.toLocaleString("en-US", {
@@ -149,8 +26,20 @@ const money = (amount: number) =>
   })}`;
 
 export default function InvoicesPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    setIsLoading(true);
+    fetchInvoices()
+      .then((data) => setInvoices(data || []))
+      .catch((err) => {
+        console.error("Failed to load invoices:", err);
+        setInvoices([]);
+      })
+      .finally(() => setIsLoading(false));
+  }, []);
 
   const filteredInvoices = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
@@ -180,7 +69,7 @@ export default function InvoicesPage() {
     0
   );
 
-  const handleMarkAsPaid = (invoiceId: string) => {
+  const handleMarkAsPaid = async (invoiceId: string) => {
     setInvoices((current) =>
       current.map((invoice) =>
         invoice.id === invoiceId
@@ -188,13 +77,20 @@ export default function InvoicesPage() {
           : invoice
       )
     );
+    try {
+      await updateInvoiceStatus(invoiceId, "paid");
+    } catch (err) {
+      console.warn("Could not update status on server:", err);
+    }
   };
 
-  const handleSendReminder = (invoice: Invoice) => {
-    // Replace with your existing reminder queue handler.
-    window.alert(
-      `Reminder review requested for ${invoice.clientName}.`
-    );
+  const handleSendReminder = async (invoice: Invoice) => {
+    try {
+      await generateReminderDraft(invoice.id);
+      window.alert(`AI Reminder draft generated for ${invoice.clientName}! Check Reminders tab.`);
+    } catch (err) {
+      console.warn("Could not generate reminder draft:", err);
+    }
   };
 
   const handleExport = () => {

@@ -1,11 +1,11 @@
 export type InvoiceStatus = "draft" | "sent" | "paid" | "overdue";
 
 export interface LineItem {
-  id: string;
+  id?: string;
   description: string;
   quantity: number;
   rate: number;
-  amount: number;
+  amount?: number;
 }
 
 export interface Invoice {
@@ -16,6 +16,7 @@ export interface Invoice {
   amount: number;
   paidAmount?: number;
   dueDate: string;
+  notes?: string;
   daysLate?: number;
   status: InvoiceStatus;
   lineItems: LineItem[];
@@ -31,9 +32,9 @@ export interface ReminderDraft {
   clientEmail: string;
   amount: number;
   daysLate: number;
-  tone: "friendly" | "firm" | "final";
+  tone: "friendly" | "firm" | "final" | "professional";
   subject: string;
   message: string;
   paymentLink: string;
-  status: "pending_approval" | "sent";
+  status: "pending_approval" | "sent" | "approved";
 }

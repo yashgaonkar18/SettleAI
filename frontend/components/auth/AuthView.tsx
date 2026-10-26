@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { supabase } from "@/lib/supabase/client";
 
@@ -12,6 +11,8 @@ interface AuthViewProps {
 
 export default function AuthView({ initialMode = "login" }: AuthViewProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const targetDestination = searchParams.get("redirectTo") || "/dashboard";
   const [mode, setMode] = useState<"login" | "signup">(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -54,7 +55,7 @@ export default function AuthView({ initialMode = "login" }: AuthViewProps) {
         }
 
         if (data.session) {
-          router.push("/dashboard");
+          router.push(targetDestination);
           router.refresh();
         }
       } else {
@@ -66,7 +67,7 @@ export default function AuthView({ initialMode = "login" }: AuthViewProps) {
             data: {
               full_name: name.trim() || undefined,
             },
-            emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined,
+            emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(targetDestination)}` : undefined,
           },
         });
 
@@ -77,7 +78,7 @@ export default function AuthView({ initialMode = "login" }: AuthViewProps) {
         }
 
         if (data.session) {
-          router.push("/dashboard");
+          router.push(targetDestination);
           router.refresh();
         } else {
           setSuccessMessage("Account created successfully! Please check your email inbox to confirm your account.");
@@ -98,7 +99,7 @@ export default function AuthView({ initialMode = "login" }: AuthViewProps) {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: mappedProvider,
         options: {
-          redirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined,
+          redirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(targetDestination)}` : undefined,
         },
       });
       if (error) {

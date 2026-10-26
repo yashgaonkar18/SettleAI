@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Zap, ArrowUpRight } from "lucide-react";
+import { Zap, ArrowUpRight, LogOut } from "lucide-react";
 
 const navItems = [
   {
@@ -35,6 +35,9 @@ const navItems = [
 
 export default function SideBar() {
   const pathname = usePathname();
+ 
+
+  
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-60 flex-col border-r border-slate-200/80 bg-white/95 p-4 backdrop-blur-md">
@@ -58,10 +61,11 @@ export default function SideBar() {
               key={item.href}
               href={item.href}
               aria-current={isActive ? "page" : undefined}
-              className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition ${isActive
+              className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                isActive
                   ? "bg-[#00d2ff]/15 text-slate-950"
                   : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                }`}
+              }`}
             >
               <Image
                 src={item.icon}
@@ -76,7 +80,7 @@ export default function SideBar() {
         })}
       </nav>
 
-      <div className="relative mb-4 mt-8 flex w-full flex-col gap-3 rounded-2xl bg-[#00d2ff] p-4 pt-7">
+      <div className="relative mb-2 mt-2 flex w-full flex-col gap-3 rounded-2xl bg-[#00d2ff] p-4 pt-7">
         <div className="absolute -top-6 right-6 flex h-12 w-12 items-center justify-center rounded-full border-2 border-black bg-white">
           <Zap size={28} className="fill-[#0b0f19] text-[#0b0f19]" />
         </div>

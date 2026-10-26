@@ -1,8 +1,10 @@
+import asyncio
 import json
 import re
 from datetime import datetime, timedelta
-from typing import Dict, Any, List
+from typing import Dict, Any
 from app.config import settings
+
 
 class GeminiService:
     @classmethod
@@ -38,10 +40,11 @@ class GeminiService:
         )
 
         try:
-            response = client.models.generate_content(
+            response = await asyncio.to_thread(
+                client.models.generate_content,
                 model=settings.GEMINI_MODEL,
                 contents=f"{system_instruction}\n\nUser request: \"{prompt}\"",
-                config={"response_mime_type": "application/json"}
+                config={"response_mime_type": "application/json"},
             )
             data = json.loads(response.text or "{}")
 
@@ -89,10 +92,11 @@ class GeminiService:
         )
 
         try:
-            response = client.models.generate_content(
+            response = await asyncio.to_thread(
+                client.models.generate_content,
                 model=settings.GEMINI_MODEL,
                 contents=prompt,
-                config={"response_mime_type": "application/json"}
+                config={"response_mime_type": "application/json"},
             )
             data = json.loads(response.text or "{}")
             return {
@@ -102,20 +106,6 @@ class GeminiService:
         except Exception as err:
             print(f"Gemini generate_reminder_draft error: {err}")
             return cls._mock_reminder_draft(client_name, invoice_number, amount, days_late, tone, payment_link)
-
-    @classmethod
-    async def generate_cash_flow_insight(cls, stats: Dict[str, Any]) -> str:
-        overdue = stats.get("overdue", 0)
-        expected = stats.get("expected", 0)
-        top_client = stats.get("topOverdueClient")
-        top_amount = stats.get("topOverdueAmount", 0)
-
-        if overdue > 0 and top_client:
-            pct = round((overdue / expected) * 100) if expected > 0 else 100
-            return f"One invoice from {top_client} is overdue (${top_amount:,.0f}) and represents {pct}% of your expected income."
-        if expected > 0:
-            return f"You have ${expected:,.0f} in expected payments scheduled this month with all accounts in good standing."
-        return "All client invoices are currently up to date. Excellent cash flow health!"
 
     @classmethod
     def _mock_parsed_invoice(cls, prompt: str) -> Dict[str, Any]:

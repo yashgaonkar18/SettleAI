@@ -2,18 +2,19 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   Bot,
   Check,
   FileText,
   Plus,
-  Sparkles,
   Trash2,
   UserRound,
   WandSparkles,
-  PencilLine
+  PencilLine,
 } from "lucide-react";
+import { createInvoice, parseInvoicePrompt } from "@/lib/api";
 
 type LineItem = {
   id: string;
@@ -43,6 +44,7 @@ const createLineItem = (): LineItem => ({
 });
 
 export default function NewInvoicePage() {
+  const router = useRouter();
   const [mode, setMode] = useState<"ai" | "manual">("ai");
   const [prompt, setPrompt] = useState("");
   const [clientName, setClientName] = useState("");
@@ -58,6 +60,8 @@ export default function NewInvoicePage() {
   ]);
   const [showPreview, setShowPreview] = useState(false);
   const [message, setMessage] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const subtotal = useMemo(
     () =>
@@ -95,46 +99,46 @@ export default function NewInvoicePage() {
     );
   };
 
-  const generateDraft = () => {
+  const generateDraft = async () => {
     if (!prompt.trim()) {
       setMessage("Paste a client message or project description first.");
       return;
     }
 
-    const email =
-      prompt.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] ?? "";
+    setIsGenerating(true);
+    setMessage("");
 
-    const amountMatch = prompt.match(
-      /(?:\$|USD\s?)(\d[\d,]*(?:\.\d{1,2})?)|(\d[\d,]*(?:\.\d{1,2})?)\s?(?:USD|dollars)/i
-    );
-
-    const amount = Number(
-      (amountMatch?.[1] ?? amountMatch?.[2] ?? "0").replace(/,/g, "")
-    );
-
-    const nameMatch = prompt.match(
-      /(?:client|from|for)\s+([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+){0,2})/i
-    );
-
-    setClientEmail(email);
-
-    if (nameMatch?.[1]) {
-      setClientName(nameMatch[1]);
+    try {
+      const parsed = await parseInvoicePrompt(prompt);
+      if (parsed.clientName) setClientName(parsed.clientName);
+      if (parsed.clientEmail) setClientEmail(parsed.clientEmail);
+      if (parsed.dueDate) setDueDate(parsed.dueDate);
+      if (parsed.notes) setNotes(parsed.notes);
+      if (parsed.lineItems && parsed.lineItems.length > 0) {
+        setLineItems(
+          parsed.lineItems.map((item) => ({
+            id: crypto.randomUUID(),
+            description: item.description,
+            quantity: item.quantity,
+            rate: item.rate,
+          }))
+        );
+      }
+      setMessage("AI drafted invoice successfully! Review details and save.");
+      setMode("manual");
+    } catch (err: any) {
+      console.warn("Gemini parse failed:", err);
+      // Simple fallback heuristic
+      const email = prompt.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] ?? "";
+      const amountMatch = prompt.match(/(?:\$|USD\s?)(\d[\d,]*(?:\.\d{1,2})?)/i);
+      const amount = Number((amountMatch?.[1] ?? "0").replace(/,/g, ""));
+      if (email) setClientEmail(email);
+      setLineItems([{ id: crypto.randomUUID(), description: prompt.trim().slice(0, 100), quantity: 1, rate: amount }]);
+      setMessage("Draft prepared. Please verify fields before saving.");
+      setMode("manual");
+    } finally {
+      setIsGenerating(false);
     }
-
-    setLineItems([
-      {
-        id: crypto.randomUUID(),
-        description: prompt.trim().slice(0, 100),
-        quantity: 1,
-        rate: amount,
-      },
-    ]);
-
-    setMessage(
-      "Draft prepared from the text. Please verify every field before saving."
-    );
-    setMode("manual");
   };
 
   const validateInvoice = () => {
@@ -161,50 +165,40 @@ export default function NewInvoicePage() {
     return true;
   };
 
-  const saveInvoice = (status: InvoiceDraft["status"]) => {
+  const saveInvoice = async (status: InvoiceDraft["status"]) => {
     if (!validateInvoice()) return;
 
-    const invoice: InvoiceDraft & {
-      id: string;
-      amount: number;
-      createdAt: string;
-    } = {
-      id: crypto.randomUUID(),
-      clientName: clientName.trim(),
-      clientEmail: clientEmail.trim(),
-      invoiceNumber,
-      issueDate,
-      dueDate,
-      notes,
-      lineItems,
-      status,
-      amount: subtotal,
-      createdAt: new Date().toISOString(),
-    };
+    setIsSaving(true);
+    setMessage("");
 
     try {
-      const existing = JSON.parse(
-        localStorage.getItem("settleai-invoices") || "[]"
-      );
-
-      if (!Array.isArray(existing)) {
-        throw new Error("Invalid saved invoice data");
-      }
-
-      localStorage.setItem(
-        "settleai-invoices",
-        JSON.stringify([invoice, ...existing])
-      );
+      const created = await createInvoice({
+        invoiceNumber,
+        clientName: clientName.trim(),
+        clientEmail: clientEmail.trim(),
+        dueDate,
+        notes,
+        amount: subtotal,
+        lineItems: lineItems.map((it) => ({
+          description: it.description,
+          quantity: it.quantity,
+          rate: it.rate,
+          amount: it.quantity * it.rate,
+        })),
+      });
 
       setMessage(
-        status === "draft"
-          ? "Invoice saved as a draft."
-          : "Invoice saved for approval. It has not been sent."
+        `Invoice ${created.invoiceNumber} created and saved to database with PayPal Checkout link!`
       );
-
       setShowPreview(false);
-    } catch {
-      setMessage("Could not save the invoice in this browser.");
+      setTimeout(() => {
+        router.push("/dashboard/invoices");
+      }, 1500);
+    } catch (err: any) {
+      console.error("Failed to save invoice:", err);
+      setMessage("Could not save invoice to database: " + (err.message || "Unknown error"));
+    } finally {
+      setIsSaving(false);
     }
   };
 

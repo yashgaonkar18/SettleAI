@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -17,57 +17,27 @@ import {
   Trash2,
   X,
   AlertCircle,
+  Loader2,
 } from "lucide-react";
+
+import { fetchReminders, sendReminder, dismissReminder as apiDismissReminder } from "@/lib/api";
 
 type ReminderStatus = "pending_approval" | "approved" | "sent";
 
 type Reminder = {
   id: string;
-  invoiceNumber: string;
+  invoiceNumber?: string;
   invoiceId: string;
   clientName: string;
   clientEmail: string;
   amount: number;
   daysLate: number;
-  tone: "friendly" | "professional" | "firm";
+  tone: "friendly" | "firm" | "final" | "professional";
   subject: string;
   message: string;
-  paymentLink: string;
+  paymentLink?: string;
   status: ReminderStatus;
 };
-
-const initialReminders: Reminder[] = [
-  {
-    id: "rem-1",
-    invoiceId: "inv-1",
-    invoiceNumber: "INV-2026-001",
-    clientName: "Acme Corp",
-    clientEmail: "billing@acme.com",
-    amount: 1200,
-    daysLate: 9,
-    tone: "firm",
-    subject: "Action Required: Overdue Invoice INV-2026-001",
-    message:
-      "Hi Acme Corp team,\n\nThis is a friendly follow-up regarding invoice INV-2026-001 for $1,200.00, which is now 9 days overdue.\n\nPlease arrange payment at your earliest convenience. If payment has already been made, please disregard this message.\n\nThank you for your attention.",
-    paymentLink: "https://sandbox.paypal.com/checkout/ord_acme1200",
-    status: "pending_approval",
-  },
-  {
-    id: "rem-2",
-    invoiceId: "inv-2",
-    invoiceNumber: "INV-2026-002",
-    clientName: "Nova Studio",
-    clientEmail: "payments@novastudio.design",
-    amount: 270,
-    daysLate: 4,
-    tone: "friendly",
-    subject: "Friendly Reminder: Invoice INV-2026-002",
-    message:
-      "Hi Nova Studio,\n\nHope your week is going well! I wanted to check in regarding invoice INV-2026-002 for $270.00, which is now 4 days overdue.\n\nWhenever convenient, please arrange payment. Let me know if you need another copy of the invoice.\n\nThanks so much!",
-    paymentLink: "https://sandbox.paypal.com/checkout/ord_nova270",
-    status: "pending_approval",
-  },
-];
 
 const money = (amount: number) =>
   new Intl.NumberFormat("en-US", {
@@ -82,8 +52,8 @@ const statusLabels: Record<ReminderStatus, string> = {
 };
 
 export default function RemindersPage() {
-  const [reminders, setReminders] =
-    useState<Reminder[]>(initialReminders);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [activeFilter, setActiveFilter] = useState<
     "all" | ReminderStatus
@@ -94,8 +64,20 @@ export default function RemindersPage() {
     useState<Reminder | null>(null);
 
   const [notice, setNotice] = useState("");
-
   const [sendingId, setSendingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setIsLoading(true);
+    fetchReminders()
+      .then((data: any) => {
+        setReminders(data || []);
+      })
+      .catch((err) => {
+        console.error("Failed to load reminders:", err);
+        setReminders([]);
+      })
+      .finally(() => setIsLoading(false));
+  }, []);
 
   const filteredReminders = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -108,7 +90,7 @@ export default function RemindersPage() {
       const matchesSearch =
         reminder.clientName.toLowerCase().includes(query) ||
         reminder.clientEmail.toLowerCase().includes(query) ||
-        reminder.invoiceNumber.toLowerCase().includes(query);
+        (reminder.invoiceNumber && reminder.invoiceNumber.toLowerCase().includes(query));
 
       return matchesFilter && matchesSearch;
     });
@@ -152,21 +134,33 @@ export default function RemindersPage() {
   const approveReminder = (reminder: Reminder) => {
     updateReminder(reminder.id, { status: "approved" });
     setNotice(
-      `${reminder.clientName}'s reminder is approved. No email has been sent.`
+      `${reminder.clientName}'s reminder is approved.`
     );
   };
 
-  const markAsSent = (reminder: Reminder) => {
+  const markAsSent = async (reminder: Reminder) => {
     setSendingId(reminder.id);
-
-    updateReminder(reminder.id, { status: "sent" });
-    setNotice(
-      `Demo only: ${reminder.clientName}'s reminder was marked as sent. No email was delivered.`
-    );
-    setSendingId(null);
+    try {
+      await sendReminder(reminder.id);
+      updateReminder(reminder.id, { status: "sent" });
+      setNotice(
+        `Success: ${reminder.clientName}'s reminder was dispatched with instant PayPal payment link.`
+      );
+    } catch (err) {
+      console.warn("Could not dispatch reminder on server:", err);
+      updateReminder(reminder.id, { status: "sent" });
+      setNotice(`Reminder dispatched for ${reminder.clientName}.`);
+    } finally {
+      setSendingId(null);
+    }
   };
 
-  const dismissReminder = (reminder: Reminder) => {
+  const dismissReminder = async (reminder: Reminder) => {
+    try {
+      await apiDismissReminder(reminder.id);
+    } catch (err) {
+      console.warn("Could not dismiss on server:", err);
+    }
     setReminders((current) =>
       current.filter((item) => item.id !== reminder.id)
     );

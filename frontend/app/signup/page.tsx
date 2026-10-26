@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import AuthView from "@/components/auth/AuthView";
 import { Metadata } from "next";
 
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function SignupPage() {
-  return <AuthView initialMode="signup" />;
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#fafafa]" />}>
+      <AuthView initialMode="signup" />
+    </Suspense>
+  );
 }
