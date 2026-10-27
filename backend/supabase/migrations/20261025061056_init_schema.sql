@@ -1,7 +1,6 @@
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 2. Custom ENUM Types
 DO $$ BEGIN
     CREATE TYPE invoice_status AS ENUM ('draft', 'sent', 'paid', 'overdue', 'cancelled');
 EXCEPTION
@@ -26,9 +25,6 @@ EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
--- ==============================================================================
--- 3. PROFILES TABLE (Linked to auth.users)
--- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email TEXT NOT NULL,
@@ -42,7 +38,6 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
 );
 
--- Auto-create profile on user signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -63,9 +58,6 @@ CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- ==============================================================================
--- 4. INVOICES TABLE
--- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.invoices (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -85,9 +77,7 @@ CREATE TABLE IF NOT EXISTS public.invoices (
     CONSTRAINT unique_user_invoice_number UNIQUE(user_id, invoice_number)
 );
 
--- ==============================================================================
--- 5. INVOICE LINE ITEMS TABLE
--- ==============================================================================
+
 CREATE TABLE IF NOT EXISTS public.invoice_line_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     invoice_id UUID NOT NULL REFERENCES public.invoices(id) ON DELETE CASCADE,
@@ -98,9 +88,7 @@ CREATE TABLE IF NOT EXISTS public.invoice_line_items (
     created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
 );
 
--- ==============================================================================
--- 6. REMINDER DRAFTS & HISTORY TABLE
--- ==============================================================================
+
 CREATE TABLE IF NOT EXISTS public.reminders (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -119,9 +107,6 @@ CREATE TABLE IF NOT EXISTS public.reminders (
     updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
 );
 
--- ==============================================================================
--- 7. PAYMENTS & PAYPAL TRANSACTIONS TABLE
--- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     invoice_id UUID REFERENCES public.invoices(id) ON DELETE SET NULL,
@@ -137,9 +122,7 @@ CREATE TABLE IF NOT EXISTS public.payments (
     created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
 );
 
--- ==============================================================================
--- 8. INDEXES FOR HIGH QUERY PERFORMANCE
--- ==============================================================================
+
 CREATE INDEX IF NOT EXISTS idx_invoices_user_id ON public.invoices(user_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON public.invoices(status);
 CREATE INDEX IF NOT EXISTS idx_invoices_due_date ON public.invoices(due_date);
@@ -150,9 +133,7 @@ CREATE INDEX IF NOT EXISTS idx_reminders_status ON public.reminders(status);
 CREATE INDEX IF NOT EXISTS idx_payments_invoice_id ON public.payments(invoice_id);
 CREATE INDEX IF NOT EXISTS idx_payments_paypal_order_id ON public.payments(paypal_order_id);
 
--- ==============================================================================
--- 9. AUTOMATIC updated_at TRIGGER FUNCTION
--- ==============================================================================
+
 CREATE OR REPLACE FUNCTION public.set_current_timestamp_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -176,16 +157,12 @@ CREATE TRIGGER tr_reminders_updated_at
     BEFORE UPDATE ON public.reminders
     FOR EACH ROW EXECUTE FUNCTION public.set_current_timestamp_updated_at();
 
--- ==============================================================================
--- 10. ROW LEVEL SECURITY (RLS) POLICIES
--- ==============================================================================
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invoice_line_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reminders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
 
--- PROFILES Policies
 CREATE POLICY "Users can view their own profile"
     ON public.profiles FOR SELECT
     USING (auth.uid() = id);
@@ -194,7 +171,6 @@ CREATE POLICY "Users can update their own profile"
     ON public.profiles FOR UPDATE
     USING (auth.uid() = id);
 
--- INVOICES Policies
 CREATE POLICY "Users can view their own invoices"
     ON public.invoices FOR SELECT
     USING (auth.uid() = user_id);
@@ -211,7 +187,6 @@ CREATE POLICY "Users can delete their own invoices"
     ON public.invoices FOR DELETE
     USING (auth.uid() = user_id);
 
--- INVOICE LINE ITEMS Policies (via parent invoice ownership)
 CREATE POLICY "Users can view their invoice line items"
     ON public.invoice_line_items FOR SELECT
     USING (
@@ -252,7 +227,6 @@ CREATE POLICY "Users can delete line items of their invoices"
         )
     );
 
--- REMINDERS Policies
 CREATE POLICY "Users can view their reminders"
     ON public.reminders FOR SELECT
     USING (auth.uid() = user_id);
@@ -269,7 +243,6 @@ CREATE POLICY "Users can delete their reminders"
     ON public.reminders FOR DELETE
     USING (auth.uid() = user_id);
 
--- PAYMENTS Policies
 CREATE POLICY "Users can view their received payments"
     ON public.payments FOR SELECT
     USING (auth.uid() = user_id);

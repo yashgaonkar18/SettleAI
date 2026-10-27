@@ -84,6 +84,16 @@ export default function InvoicesPage() {
     }
   };
 
+  const handleInvoiceUpdated = (updated: Invoice) => {
+    setInvoices((current) =>
+      current.map((inv) => (inv.id === updated.id ? updated : inv))
+    );
+  };
+
+  const handleDeleteInvoice = (invoiceId: string) => {
+    setInvoices((current) => current.filter((inv) => inv.id !== invoiceId));
+  };
+
   const handleSendReminder = async (invoice: Invoice) => {
     try {
       await generateReminderDraft(invoice.id);
@@ -191,13 +201,22 @@ export default function InvoicesPage() {
               </div>
             </div>
 
-            <p className="mt-4 text-3xl font-bold tracking-tight">
-              {money(receivedAmount)}
-            </p>
+            {isLoading ? (
+              <>
+                <div className="mt-4 h-9 w-32 rounded-lg bg-slate-200 animate-pulse" />
+                <div className="mt-2 h-4 w-24 rounded bg-slate-100 animate-pulse" />
+              </>
+            ) : (
+              <>
+                <p className="mt-4 text-3xl font-bold tracking-tight">
+                  {money(receivedAmount)}
+                </p>
 
-            <p className="mt-2 text-xs text-slate-500">
-              {invoices.filter((i) => i.status === "paid").length} paid invoices
-            </p>
+                <p className="mt-2 text-xs text-slate-500">
+                  {invoices.filter((i) => i.status === "paid").length} paid invoices
+                </p>
+              </>
+            )}
           </div>
 
           <div className="rounded-2xl border border-[#00d2ff]  bg-[#00d2ff] p-5">
@@ -211,13 +230,22 @@ export default function InvoicesPage() {
               </div>
             </div>
 
-            <p className="mt-4 text-3xl font-bold tracking-tight">
-              {money(expectedAmount)}
-            </p>
+            {isLoading ? (
+              <>
+                <div className="mt-4 h-9 w-32 rounded-lg bg-slate-900/20 animate-pulse" />
+                <div className="mt-2 h-4 w-28 rounded bg-slate-900/10 animate-pulse" />
+              </>
+            ) : (
+              <>
+                <p className="mt-4 text-3xl font-bold tracking-tight">
+                  {money(expectedAmount)}
+                </p>
 
-            <p className="mt-2 text-xs text-slate-700">
-              {invoices.filter((i) => i.status === "sent").length} awaiting payment
-            </p>
+                <p className="mt-2 text-xs text-slate-700">
+                  {invoices.filter((i) => i.status === "sent").length} awaiting payment
+                </p>
+              </>
+            )}
           </div>
 
           <div className="rounded-2xl border border-[#0B0F19]/20 bg-[#0B0F19] p-5 text-white">
@@ -231,20 +259,32 @@ export default function InvoicesPage() {
               </div>
             </div>
 
-            <p className="mt-4 text-3xl font-bold tracking-tight">
-              {money(overdueAmount)}
-            </p>
+            {isLoading ? (
+              <>
+                <div className="mt-4 h-9 w-32 rounded-lg bg-white/20 animate-pulse" />
+                <div className="mt-2 h-4 w-28 rounded bg-white/10 animate-pulse" />
+              </>
+            ) : (
+              <>
+                <p className="mt-4 text-3xl font-bold tracking-tight">
+                  {money(overdueAmount)}
+                </p>
 
-            <p className="mt-2 text-xs text-white/80">
-              {overdueInvoices.length} overdue invoices
-            </p>
+                <p className="mt-2 text-xs text-white/80">
+                  {overdueInvoices.length} overdue invoices
+                </p>
+              </>
+            )}
           </div>
         </section>
 
         <InvoiceTable
           invoices={filteredInvoices}
+          isLoading={isLoading}
           onSendReminder={handleSendReminder}
           onMarkAsPaid={handleMarkAsPaid}
+          onInvoiceUpdated={handleInvoiceUpdated}
+          onDeleteInvoice={handleDeleteInvoice}
         />
 
         <div className="flex flex-col justify-between gap-2 rounded-2xl border border-gray-300 bg-white p-4 sm:flex-row sm:items-center">

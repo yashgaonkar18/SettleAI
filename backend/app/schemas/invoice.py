@@ -18,6 +18,15 @@ class CreateInvoiceSchema(BaseModel):
     notes: Optional[str] = None
     userId: Optional[str] = "user-default"
 
+class UpdateInvoiceSchema(BaseModel):
+    clientName: Optional[str] = None
+    clientEmail: Optional[str] = None
+    amount: Optional[float] = None
+    dueDate: Optional[str] = None
+    notes: Optional[str] = None
+    status: Optional[Literal["draft", "sent", "paid", "overdue", "cancelled"]] = None
+    lineItems: Optional[List[LineItemSchema]] = None
+
 class UpdateStatusSchema(BaseModel):
     status: Literal["draft", "sent", "paid", "overdue", "cancelled"]
     paidAmount: Optional[float] = None

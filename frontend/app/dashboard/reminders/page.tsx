@@ -211,7 +211,11 @@ export default function RemindersPage() {
                 <AlertCircle size={20} />
               </div>
             </div>
-            <p className="mt-4 text-2xl font-bold">{money(totalOverdue)}</p>
+            {isLoading ? (
+              <div className="mt-4 h-8 w-28 rounded-lg bg-slate-200 animate-pulse" />
+            ) : (
+              <p className="mt-4 text-2xl font-bold">{money(totalOverdue)}</p>
+            )}
             <p className="mt-2 text-xs text-slate-500">
               Across active reminders
             </p>
@@ -222,7 +226,11 @@ export default function RemindersPage() {
               <span className="text-sm font-medium">Needs review</span>
               <BellRing size={21} />
             </div>
-            <p className="mt-4 text-3xl font-bold">{pendingCount}</p>
+            {isLoading ? (
+              <div className="mt-4 h-8 w-12 rounded-lg bg-slate-900/20 animate-pulse" />
+            ) : (
+              <p className="mt-4 text-3xl font-bold">{pendingCount}</p>
+            )}
             <p className="mt-2 text-xs">Waiting for your approval</p>
           </div>
 
@@ -233,7 +241,11 @@ export default function RemindersPage() {
               </span>
               <CheckCircle2 size={21} />
             </div>
-            <p className="mt-4 text-3xl font-bold">{approvedCount}</p>
+            {isLoading ? (
+              <div className="mt-4 h-8 w-12 rounded-lg bg-white/20 animate-pulse" />
+            ) : (
+              <p className="mt-4 text-3xl font-bold">{approvedCount}</p>
+            )}
             <p className="mt-2 text-xs text-white/80">
               Ready for delivery integration
             </p>
@@ -246,9 +258,13 @@ export default function RemindersPage() {
               </span>
               <Mail size={21} className="text-black" />
             </div>
-            <p className="mt-4 text-3xl font-bold text-black">
-              {sentCount}
-            </p>
+            {isLoading ? (
+              <div className="mt-4 h-8 w-12 rounded-lg bg-black/20 animate-pulse" />
+            ) : (
+              <p className="mt-4 text-3xl font-bold text-black">
+                {sentCount}
+              </p>
+            )}
             <p className="mt-2 text-xs text-black">
               Marked as sent in this demo
             </p>
@@ -308,7 +324,28 @@ export default function RemindersPage() {
           </div>
 
           <div className="border-t border-gray-300">
-            {filteredReminders.length === 0 ? (
+            {isLoading ? (
+              <div className="divide-y divide-gray-300">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="p-5 sm:p-6 animate-pulse">
+                    <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                      <div className="flex items-start gap-3">
+                        <div className="h-10 w-10 shrink-0 rounded-xl bg-slate-200" />
+                        <div className="space-y-2">
+                          <div className="h-4 w-44 rounded bg-slate-200" />
+                          <div className="h-3 w-64 rounded bg-slate-100" />
+                          <div className="h-3 w-32 rounded bg-slate-100" />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="h-9 w-24 rounded-xl bg-slate-200" />
+                        <div className="h-9 w-20 rounded-xl bg-slate-200" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : filteredReminders.length === 0 ? (
               <div className="px-5 py-16 text-center">
                 <CheckCircle2
                   size={35}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -23,25 +23,18 @@ type LineItem = {
   rate: number;
 };
 
-type InvoiceDraft = {
-  clientName: string;
-  clientEmail: string;
-  invoiceNumber: string;
-  issueDate: string;
-  dueDate: string;
-  notes: string;
-  lineItems: LineItem[];
-  status: "draft" | "pending_approval";
-};
+type InvoiceStatus = "draft" | "pending_approval";
 
-const today = new Date().toISOString().slice(0, 10);
-
-const createLineItem = (): LineItem => ({
-  id: crypto.randomUUID(),
+// The id is passed in for the initial item so the server and client agree on it.
+// Event handlers call this with no argument and get a fresh random UUID.
+const createLineItem = (id: string = crypto.randomUUID()): LineItem => ({
+  id,
   description: "",
   quantity: 1,
   rate: 0,
 });
+
+const pad = (n: number) => String(n).padStart(2, "0");
 
 export default function NewInvoicePage() {
   const router = useRouter();
@@ -49,19 +42,29 @@ export default function NewInvoicePage() {
   const [prompt, setPrompt] = useState("");
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
-  const [invoiceNumber, setInvoiceNumber] = useState(
-    `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`
-  );
-  const [issueDate, setIssueDate] = useState(today);
+  // Time-based fields start empty and are filled in the effect below,
+  // so nothing time-dependent is evaluated during prerender.
+  const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [issueDate, setIssueDate] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("Thank you for your business.");
   const [lineItems, setLineItems] = useState<LineItem[]>([
-    createLineItem(),
+    createLineItem("item-1"),
   ]);
   const [showPreview, setShowPreview] = useState(false);
   const [message, setMessage] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const now = new Date();
+    setIssueDate(
+      `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+    );
+    setInvoiceNumber(
+      `INV-${now.getFullYear()}-${String(now.getTime()).slice(-4)}`
+    );
+  }, []);
 
   const subtotal = useMemo(
     () =>
@@ -88,12 +91,12 @@ export default function NewInvoicePage() {
       current.map((item) =>
         item.id === id
           ? {
-            ...item,
-            [field]:
-              field === "description"
-                ? value
-                : Math.max(0, Number(value) || 0),
-          }
+              ...item,
+              [field]:
+                field === "description"
+                  ? value
+                  : Math.max(0, Number(value) || 0),
+            }
           : item
       )
     );
@@ -129,11 +132,21 @@ export default function NewInvoicePage() {
     } catch (err: any) {
       console.warn("Gemini parse failed:", err);
       // Simple fallback heuristic
-      const email = prompt.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] ?? "";
-      const amountMatch = prompt.match(/(?:\$|USD\s?)(\d[\d,]*(?:\.\d{1,2})?)/i);
+      const email =
+        prompt.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] ?? "";
+      const amountMatch = prompt.match(
+        /(?:\$|USD\s?)(\d[\d,]*(?:\.\d{1,2})?)/i
+      );
       const amount = Number((amountMatch?.[1] ?? "0").replace(/,/g, ""));
       if (email) setClientEmail(email);
-      setLineItems([{ id: crypto.randomUUID(), description: prompt.trim().slice(0, 100), quantity: 1, rate: amount }]);
+      setLineItems([
+        {
+          id: crypto.randomUUID(),
+          description: prompt.trim().slice(0, 100),
+          quantity: 1,
+          rate: amount,
+        },
+      ]);
       setMessage("Draft prepared. Please verify fields before saving.");
       setMode("manual");
     } finally {
@@ -147,7 +160,10 @@ export default function NewInvoicePage() {
       return false;
     }
 
-    if (!clientEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail)) {
+    if (
+      !clientEmail.trim() ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail)
+    ) {
       setMessage("Please enter a valid client email address.");
       return false;
     }
@@ -158,14 +174,16 @@ export default function NewInvoicePage() {
     }
 
     if (lineItems.some((item) => !item.description.trim() || item.rate <= 0)) {
-      setMessage("Add a description and a rate greater than zero to each item.");
+      setMessage(
+        "Add a description and a rate greater than zero to each item."
+      );
       return false;
     }
 
     return true;
   };
 
-  const saveInvoice = async (status: InvoiceDraft["status"]) => {
+  const saveInvoice = async (status: InvoiceStatus) => {
     if (!validateInvoice()) return;
 
     setIsSaving(true);
@@ -187,16 +205,16 @@ export default function NewInvoicePage() {
         })),
       });
 
-      setMessage(
-        `Invoice ${created.invoiceNumber} created and saved to database with PayPal Checkout link!`
-      );
+      setMessage(`Invoice ${created.invoiceNumber} saved.`);
       setShowPreview(false);
       setTimeout(() => {
         router.push("/dashboard/invoices");
       }, 1500);
     } catch (err: any) {
       console.error("Failed to save invoice:", err);
-      setMessage("Could not save invoice to database: " + (err.message || "Unknown error"));
+      setMessage(
+        "Could not save invoice to database: " + (err.message || "Unknown error")
+      );
     } finally {
       setIsSaving(false);
     }
@@ -240,10 +258,11 @@ export default function NewInvoicePage() {
                 <button
                   type="button"
                   onClick={() => setMode("ai")}
-                  className={`rounded-xl border p-4 text-left transition ${mode === "ai"
+                  className={`rounded-xl border p-4 text-left transition ${
+                    mode === "ai"
                       ? "border-[#00a9d8] bg-[#e4f9ff]"
                       : "border-gray-300 hover:bg-[#faf7ef]"
-                    }`}
+                  }`}
                 >
                   <Bot size={22} className="mb-3 text-[#00d2ff]" />
                   <p className="font-semibold">AI-assisted</p>
@@ -258,10 +277,11 @@ export default function NewInvoicePage() {
                     setMode("manual");
                     setMessage("");
                   }}
-                  className={`rounded-xl border p-4 text-left transition ${mode === "manual"
+                  className={`rounded-xl border p-4 text-left transition ${
+                    mode === "manual"
                       ? "border-[#00a9d8] bg-[#e4f9ff]"
                       : "border-gray-300 hover:bg-[#faf7ef]"
-                    }`}
+                  }`}
                 >
                   <FileText size={22} className="mb-3 text-[#008fb8]" />
                   <p className="font-semibold">Manual entry</p>
@@ -293,10 +313,11 @@ export default function NewInvoicePage() {
                   <button
                     type="button"
                     onClick={generateDraft}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0b0f19] px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
+                    disabled={isGenerating}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0b0f19] px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-60"
                   >
                     <PencilLine size={17} />
-                    Prepare draft
+                    {isGenerating ? "Preparing..." : "Prepare draft"}
                   </button>
                 </div>
               )}
@@ -344,7 +365,10 @@ export default function NewInvoicePage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label htmlFor="invoice-number" className="text-sm font-medium">
+                  <label
+                    htmlFor="invoice-number"
+                    className="text-sm font-medium"
+                  >
                     Invoice number
                   </label>
                   <input
@@ -368,14 +392,14 @@ export default function NewInvoicePage() {
                   />
                 </div>
 
-                <div className="space-y-2 sm:col-span-2 flex flex-col">
+                <div className="flex flex-col space-y-2 sm:col-span-2">
                   <label htmlFor="due-date" className="text-sm font-medium">
                     Due date *
                   </label>
                   <input
                     id="due-date"
                     type="date"
-                    min={issueDate}
+                    min={issueDate || undefined}
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
                     className="w-full rounded-xl border border-gray-300 bg-white px-3 py-3 text-sm outline-none focus:border-[#00a9d8] sm:max-w-[calc(50%-8px)]"
@@ -438,7 +462,11 @@ export default function NewInvoicePage() {
                         <input
                           value={item.description}
                           onChange={(e) =>
-                            updateLineItem(item.id, "description", e.target.value)
+                            updateLineItem(
+                              item.id,
+                              "description",
+                              e.target.value
+                            )
                           }
                           placeholder="Website development"
                           className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#00a9d8]"
@@ -501,6 +529,7 @@ export default function NewInvoicePage() {
                 </p>
               </div>
             </section>
+
             {message && (
               <div
                 role="status"
@@ -513,7 +542,7 @@ export default function NewInvoicePage() {
             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
               <Link
                 href="/dashboard/invoices"
-                className="inline-flex items-center justify-center gap-2 rounded-xl text-white border border-gray-300 bg-[#0b0f19] px-5 py-3 text-sm font-semibold hover:bg-white hover:text-black"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-300 bg-[#0b0f19] px-5 py-3 text-sm font-semibold text-white hover:bg-white hover:text-black"
               >
                 Cancel
               </Link>
@@ -657,17 +686,19 @@ export default function NewInvoicePage() {
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
               <button
                 type="button"
+                disabled={isSaving}
                 onClick={() => saveInvoice("draft")}
-                className="flex-1 rounded-xl border border-[#ded6c3] px-4 py-3 text-sm font-semibold hover:bg-[#f7f3e6]"
+                className="flex-1 rounded-xl border border-[#ded6c3] px-4 py-3 text-sm font-semibold hover:bg-[#f7f3e6] disabled:opacity-60"
               >
-                Save as draft
+                {isSaving ? "Saving..." : "Save as draft"}
               </button>
               <button
                 type="button"
+                disabled={isSaving}
                 onClick={() => saveInvoice("pending_approval")}
-                className="flex-1 rounded-xl bg-[#202020] px-4 py-3 text-sm font-semibold text-white hover:bg-slate-700"
+                className="flex-1 rounded-xl bg-[#202020] px-4 py-3 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
               >
-                Approve & continue
+                {isSaving ? "Saving..." : "Approve & continue"}
               </button>
             </div>
 

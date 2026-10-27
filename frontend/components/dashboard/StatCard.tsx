@@ -6,6 +6,7 @@ interface StatCardProps {
     amount: number;
     icon: ReactNode;
     variant?: "received" | "overdue";
+    isLoading?: boolean;
 }
 
 const variants = {
@@ -24,6 +25,7 @@ export default function StatCard({
     amount,
     icon,
     variant = "received",
+    isLoading = false,
 }: StatCardProps) {
     const style = variants[variant];
 
@@ -42,10 +44,14 @@ export default function StatCard({
                     {label}
                 </p>
 
-                <p className="whitespace-nowrap text-sm font-bold text-white">
-                    {variant === "overdue" ? "" : "$"}
-                    {amount.toLocaleString("en-US")}
-                </p>
+                {isLoading ? (
+                    <div className="mt-1 h-4 w-14 rounded bg-white/20 animate-pulse" />
+                ) : (
+                    <p className="whitespace-nowrap text-sm font-bold text-white">
+                        {variant === "overdue" ? "" : "$"}
+                        {amount.toLocaleString("en-US")}
+                    </p>
+                )}
             </div>
         </div>
     );

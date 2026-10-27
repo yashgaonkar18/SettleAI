@@ -42,7 +42,7 @@ export default function SideBar() {
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-60 flex-col border-r border-slate-200/80 bg-white/95 p-4 backdrop-blur-md">
       <Link
-        href="/dashboard"
+        href="/"
         className="mb-10 mt-3 flex items-center justify-center text-3xl font-black text-slate-900"
       >
         <span className="tracking-tight">SettleAI</span>

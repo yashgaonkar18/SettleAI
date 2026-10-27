@@ -1,6 +1,6 @@
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, status
-from app.schemas.invoice import CreateInvoiceSchema, UpdateStatusSchema, PromptInvoiceSchema
+from app.schemas.invoice import CreateInvoiceSchema, UpdateInvoiceSchema, UpdateStatusSchema, PromptInvoiceSchema
 from app.services.invoice_service import InvoiceService
 from app.services.gemini_service import GeminiService
 
@@ -8,7 +8,7 @@ router = APIRouter(prefix="/api/invoices", tags=["Invoices"])
 
 @router.get("")
 async def list_invoices(
-    userId: Optional[str] = Query("user-default"),
+    userId: Optional[str] = Query(""),
     status: Optional[str] = Query(None)
 ):
     try:
@@ -52,3 +52,20 @@ async def update_status(invoice_id: str, payload: UpdateStatusSchema):
         return {"success": True, "message": f"Invoice marked as {payload.status}", "invoice": updated}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/{invoice_id}")
+async def update_invoice(invoice_id: str, payload: UpdateInvoiceSchema):
+    try:
+        updated = await InvoiceService.update_invoice(invoice_id, payload)
+        return {"success": True, "message": "Invoice updated successfully", "invoice": updated}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/{invoice_id}")
+async def delete_invoice(invoice_id: str):
+    try:
+        await InvoiceService.delete_invoice(invoice_id)
+        return {"success": True, "message": "Invoice deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

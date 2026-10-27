@@ -16,6 +16,7 @@ interface CashFlowHeroProps {
   expectedInvoices: number;
   atRiskInvoices: number;
   insightText: string;
+  isLoading?: boolean;
   onViewInvoices: () => void;
 }
 
@@ -31,6 +32,7 @@ export default function CashFlowHero({
   expectedInvoices,
   atRiskInvoices,
   insightText,
+  isLoading = false,
   onViewInvoices,
 }: CashFlowHeroProps) {
   return (
@@ -43,14 +45,22 @@ export default function CashFlowHero({
             Hi {userName}!
           </p>
 
-          <h1 className="max-w-xl text-3xl font-bold leading-[1.05] tracking-tight text-slate-950 sm:text-4xl xl:text-5xl">
-            You’ve been paid{" "}
-            {formatCurrency(receivedAmount)} this month
-          </h1>
+          {isLoading ? (
+            <div className="my-2 h-12 w-80 max-w-full rounded-2xl bg-slate-950/20 animate-pulse" />
+          ) : (
+            <h1 className="max-w-xl text-3xl font-bold leading-[1.05] tracking-tight text-slate-950 sm:text-4xl xl:text-5xl">
+              You’ve been paid{" "}
+              {formatCurrency(receivedAmount)} this month
+            </h1>
+          )}
 
-          <p className="mt-4 max-w-md text-sm leading-relaxed text-white sm:text-base">
-            {insightText}
-          </p>
+          {isLoading ? (
+            <div className="mt-4 h-5 w-64 max-w-full rounded-lg bg-white/40 animate-pulse" />
+          ) : (
+            <p className="mt-4 max-w-md text-sm leading-relaxed text-white sm:text-base">
+              {insightText}
+            </p>
+          )}
 
           <button
             onClick={onViewInvoices}
@@ -69,13 +79,22 @@ export default function CashFlowHero({
               Received
             </h2>
 
-            <p className="mt-1 text-2xl font-bold tracking-tight text-slate-950">
-              {formatCurrency(receivedAmount)}
-            </p>
+            {isLoading ? (
+              <>
+                <div className="mt-2 h-7 w-28 rounded-lg bg-slate-200 animate-pulse" />
+                <div className="mt-2 h-4 w-16 rounded bg-slate-100 animate-pulse" />
+              </>
+            ) : (
+              <>
+                <p className="mt-1 text-2xl font-bold tracking-tight text-slate-950">
+                  {formatCurrency(receivedAmount)}
+                </p>
 
-            <p className="mt-1 text-sm text-slate-500">
-              {receivedInvoices} invoices
-            </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  {receivedInvoices} invoices
+                </p>
+              </>
+            )}
 
             <div className="absolute bottom-0 left-5 right-5 flex h-24 items-end gap-3">
               <div className="h-8 w-9 rounded-t-lg bg-violet-200/70" />
@@ -92,13 +111,22 @@ export default function CashFlowHero({
               Expected
             </h2>
 
-            <p className="mt-1 text-2xl font-bold tracking-tight text-slate-950">
-              {formatCurrency(expectedAmount)}
-            </p>
+            {isLoading ? (
+              <>
+                <div className="mt-2 h-7 w-28 rounded-lg bg-slate-900/20 animate-pulse" />
+                <div className="mt-2 h-4 w-16 rounded bg-slate-900/10 animate-pulse" />
+              </>
+            ) : (
+              <>
+                <p className="mt-1 text-2xl font-bold tracking-tight text-slate-950">
+                  {formatCurrency(expectedAmount)}
+                </p>
 
-            <p className="mt-1 text-sm text-slate-800/80">
-              {expectedInvoices} invoices
-            </p>
+                <p className="mt-1 text-sm text-slate-800/80">
+                  {expectedInvoices} invoices
+                </p>
+              </>
+            )}
 
             <div className="absolute -bottom-16 -right-5 h-40 w-40 rounded-full border border-slate-900/80">
               <div className="absolute inset-x-7 inset-y-0 rounded-[50%] border border-slate-900/80" />
@@ -115,13 +143,22 @@ export default function CashFlowHero({
               At risk
             </h2>
 
-            <p className="mt-1 text-2xl font-bold tracking-tight">
-              {formatCurrency(atRiskAmount)}
-            </p>
+            {isLoading ? (
+              <>
+                <div className="mt-2 h-7 w-28 rounded-lg bg-white/20 animate-pulse" />
+                <div className="mt-2 h-4 w-16 rounded bg-white/10 animate-pulse" />
+              </>
+            ) : (
+              <>
+                <p className="mt-1 text-2xl font-bold tracking-tight">
+                  {formatCurrency(atRiskAmount)}
+                </p>
 
-            <p className="mt-1 text-sm text-white/80">
-              {atRiskInvoices} invoices
-            </p>
+                <p className="mt-1 text-sm text-white/80">
+                  {atRiskInvoices} invoices
+                </p>
+              </>
+            )}
 
             <div className="absolute -bottom-5 right-4 rotate-[-8deg]">
               <div className="relative h-24 w-20 rounded-md border-2 border-slate-950 bg-white shadow-sm">

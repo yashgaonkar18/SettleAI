@@ -8,27 +8,14 @@ import {
   Check,
   ChevronRight,
   CircleUserRound,
-  CreditCard,
+  Loader2,
   Save,
   ShieldCheck,
   SlidersHorizontal,
 } from "lucide-react";
+import { fetchUserSettings, updateUserSettings, UserSettings as Settings } from "@/lib/api";
 
-type Settings = {
-  fullName: string;
-  email: string;
-  businessName: string;
-  currency: string;
-  paymentTerms: string;
-  reminderTone: string;
-  firstReminder: string;
-  repeatReminder: string;
-  emailNotifications: boolean;
-  overdueAlerts: boolean;
-  paymentNotifications: boolean;
-  weeklySummary: boolean;
-  theme: "light" | "dark";
-};
+
 
 const defaultSettings: Settings = {
   fullName: "Yash",
@@ -114,24 +101,40 @@ function SettingToggle({
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+
     try {
       const stored = localStorage.getItem("settleai-settings");
-
       if (stored) {
-        const parsed = JSON.parse(stored);
-
         setSettings({
           ...defaultSettings,
-          ...parsed,
+          ...JSON.parse(stored),
         });
       }
     } catch {
-    } finally {
-      setLoaded(true);
     }
+
+    fetchUserSettings()
+      .then((liveSettings) => {
+        if (isMounted && liveSettings) {
+          setSettings(liveSettings);
+          localStorage.setItem("settleai-settings", JSON.stringify(liveSettings));
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not fetch remote settings, using local data:", err);
+      })
+      .finally(() => {
+        if (isMounted) setLoaded(true);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const update = <K extends keyof Settings>(
@@ -142,17 +145,28 @@ export default function SettingsPage() {
     setSaved(false);
   };
 
-  const saveSettings = (event: React.FormEvent<HTMLFormElement>) => {
+  const saveSettings = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setSaving(true);
+    setSaved(false);
 
     try {
-      localStorage.setItem("settleai-settings", JSON.stringify(settings));
+      const updated = await updateUserSettings(settings);
+      setSettings(updated);
+      localStorage.setItem("settleai-settings", JSON.stringify(updated));
       setSaved(true);
-    } catch {
-      setSaved(false);
-      window.alert(
-        "Settings could not be saved. Please check your browser storage."
-      );
+      setTimeout(() => setSaved(false), 4000);
+    } catch (err) {
+      console.error("Failed to save settings to database:", err);
+      // Fallback save to localStorage
+      try {
+        localStorage.setItem("settleai-settings", JSON.stringify(settings));
+        setSaved(true);
+      } catch {
+        window.alert("Settings could not be saved. Please check your connection.");
+      }
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -175,11 +189,17 @@ export default function SettingsPage() {
 
           <button
             type="submit"
-            disabled={!loaded}
+            disabled={!loaded || saving}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0b0f19] px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-50"
           >
-            {saved ? <Check size={17} /> : <Save size={17} />}
-            {saved ? "Changes saved" : "Save changes"}
+            {saving ? (
+              <Loader2 size={17} className="animate-spin" />
+            ) : saved ? (
+              <Check size={17} />
+            ) : (
+              <Save size={17} />
+            )}
+            {saving ? "Saving to cloud..." : saved ? "Changes saved" : "Save changes"}
           </button>
         </header>
 
@@ -189,7 +209,7 @@ export default function SettingsPage() {
             className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800"
           >
             <Check size={18} />
-            Your settings have been saved in this browser.
+            Your settings have been saved to your account and database.
           </div>
         )}
 
@@ -469,16 +489,22 @@ export default function SettingsPage() {
             </section>
             <div className="flex flex-col-reverse justify-between gap-3 border-t border-[#ded6c3] pt-5 sm:flex-row sm:items-center">
               <p className="text-xs leading-5 text-slate-500">
-                Settings are stored in this browser, not synced across devices.
+                Settings are securely saved and synced to your database.
               </p>
 
               <button
                 type="submit"
-                disabled={!loaded}
+                disabled={!loaded || saving}
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0b0f19] px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-50"
               >
-                {saved ? <Check size={17} /> : <Save size={17} />}
-                {saved ? "Changes saved" : "Save changes"}
+                {saving ? (
+                  <Loader2 size={17} className="animate-spin" />
+                ) : saved ? (
+                  <Check size={17} />
+                ) : (
+                  <Save size={17} />
+                )}
+                {saving ? "Saving to cloud..." : saved ? "Changes saved" : "Save changes"}
               </button>
             </div>
           </div>

@@ -17,14 +17,9 @@ export default function Footer() {
         </div>
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 sm:gap-8">
-          <div className="flex flex-wrap items-center gap-6 text-xs text-slate-500 font-medium">
-            <a href="/#how-it-works" className="hover:text-slate-900 transition">How it works</a>
-            <a href="/#key-benefits" className="hover:text-slate-900 transition">Key benefits</a>
-          </div>
-
           <div className="flex items-center gap-4 text-slate-400">
             <a
-              href="https://twitter.com"
+              href="https://x.com/iamyashjr18"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Twitter / X"
@@ -36,7 +31,7 @@ export default function Footer() {
             </a>
 
             <a
-              href="https://youtube.com"
+              href="https://www.youtube.com/@yashrangergaming"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="YouTube"
@@ -48,7 +43,7 @@ export default function Footer() {
             </a>
 
             <a
-              href="https://linkedin.com"
+              href="https://www.linkedin.com/in/yash-gaonkar-652003253"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="LinkedIn"

@@ -3,7 +3,7 @@ from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.routers import invoices, reminders, payments, dashboard
+from app.routers import invoices, reminders, payments, dashboard, settings as settings_router
 from app.jobs.overdue_job import start_overdue_scheduler, scheduler
 
 
@@ -55,3 +55,4 @@ app.include_router(invoices.router)
 app.include_router(reminders.router)
 app.include_router(payments.router)
 app.include_router(dashboard.router)
+app.include_router(settings_router.router)

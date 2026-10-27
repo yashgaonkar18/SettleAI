@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from app.database import supabase_admin
-from app.schemas.invoice import CreateInvoiceSchema
+from app.schemas.invoice import CreateInvoiceSchema, UpdateInvoiceSchema
 from app.services.paypal_service import PayPalService
 
 def is_valid_uuid(val: Optional[str]) -> bool:
@@ -58,6 +58,7 @@ class InvoiceService:
                         "amount": float(inv["amount"]),
                         "paidAmount": float(inv.get("paid_amount") or 0.0),
                         "dueDate": inv["due_date"],
+                        "notes": inv.get("notes") or "",
                         "daysLate": days_late,
                         "status": inv["status"],
                         "paypalOrderId": inv.get("paypal_order_id"),
@@ -97,11 +98,21 @@ class InvoiceService:
                 "amount": float(inv["amount"]),
                 "paidAmount": float(inv.get("paid_amount") or 0.0),
                 "dueDate": inv["due_date"],
+                "notes": inv.get("notes") or "",
                 "status": inv["status"],
                 "paypalOrderId": inv.get("paypal_order_id"),
                 "paymentLink": inv.get("payment_link"),
                 "createdAt": inv["created_at"],
-                "lineItems": (inv.get("line_items") or []),
+                "lineItems": [
+                    {
+                        "id": item["id"],
+                        "description": item["description"],
+                        "quantity": float(item["quantity"]),
+                        "rate": float(item["rate"]),
+                        "amount": float(item["amount"]),
+                    }
+                    for item in (inv.get("line_items") or [])
+                ],
             }
 
         raise ValueError(f"Invoice with ID {invoice_id} not found")
@@ -192,3 +203,55 @@ class InvoiceService:
                 print(f"Supabase update status error: {e}")
 
         return {"id": invoice_id, "status": status, "updated": True}
+
+    @classmethod
+    async def update_invoice(cls, invoice_id: str, data: UpdateInvoiceSchema) -> Dict[str, Any]:
+        if not supabase_admin:
+            raise ValueError("Database connection unavailable.")
+
+        update_payload: Dict[str, Any] = {}
+        if data.clientName is not None:
+            update_payload["client_name"] = data.clientName
+        if data.clientEmail is not None:
+            update_payload["client_email"] = data.clientEmail
+        if data.dueDate is not None:
+            update_payload["due_date"] = data.dueDate
+        if data.notes is not None:
+            update_payload["notes"] = data.notes
+        if data.status is not None:
+            update_payload["status"] = data.status
+
+        if data.lineItems is not None:
+            total_amount = sum(it.quantity * it.rate for it in data.lineItems)
+            update_payload["amount"] = total_amount
+
+            # Replace line items
+            supabase_admin.from_("invoice_line_items").delete().eq("invoice_id", invoice_id).execute()
+            if len(data.lineItems) > 0:
+                items_payload = [
+                    {
+                        "invoice_id": invoice_id,
+                        "description": it.description,
+                        "quantity": it.quantity,
+                        "rate": it.rate,
+                        "amount": it.amount if it.amount is not None else (it.quantity * it.rate),
+                    }
+                    for it in data.lineItems
+                ]
+                supabase_admin.from_("invoice_line_items").insert(items_payload).execute()
+        elif data.amount is not None:
+            update_payload["amount"] = data.amount
+
+        if update_payload:
+            supabase_admin.from_("invoices").update(update_payload).eq("id", invoice_id).execute()
+
+        return await cls.get_invoice_by_id(invoice_id)
+
+    @classmethod
+    async def delete_invoice(cls, invoice_id: str) -> bool:
+        if not supabase_admin:
+            raise ValueError("Database connection unavailable.")
+
+        supabase_admin.from_("invoice_line_items").delete().eq("invoice_id", invoice_id).execute()
+        supabase_admin.from_("invoices").delete().eq("id", invoice_id).execute()
+        return True
