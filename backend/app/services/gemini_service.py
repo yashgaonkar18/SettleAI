@@ -1,27 +1,20 @@
 import asyncio
 import json
-import re
 from datetime import datetime, timedelta
 from typing import Dict, Any
 from app.config import settings
 
-
 class GeminiService:
     @classmethod
     def _get_client(cls):
-        try:
-            from google import genai
-            if settings.GEMINI_API_KEY and settings.GEMINI_API_KEY != "your_gemini_api_key":
-                return genai.Client(api_key=settings.GEMINI_API_KEY)
-        except Exception as e:
-            print(f"Gemini client init warning: {e}")
-        return None
+        from google import genai
+        if not settings.GEMINI_API_KEY:
+            raise ValueError("GEMINI_API_KEY is not configured in settings.")
+        return genai.Client(api_key=settings.GEMINI_API_KEY)
 
     @classmethod
     async def parse_invoice_prompt(cls, prompt: str) -> Dict[str, Any]:
         client = cls._get_client()
-        if not client:
-            return cls._mock_parsed_invoice(prompt)
 
         today_str = datetime.now().strftime("%Y-%m-%d")
         system_instruction = (
@@ -39,31 +32,27 @@ class GeminiService:
             f"}}"
         )
 
-        try:
-            response = await asyncio.to_thread(
-                client.models.generate_content,
-                model=settings.GEMINI_MODEL,
-                contents=f"{system_instruction}\n\nUser request: \"{prompt}\"",
-                config={"response_mime_type": "application/json"},
-            )
-            data = json.loads(response.text or "{}")
+        response = await asyncio.to_thread(
+            client.models.generate_content,
+            model=settings.GEMINI_MODEL,
+            contents=f"{system_instruction}\n\nUser request: \"{prompt}\"",
+            config={"response_mime_type": "application/json"},
+        )
+        data = json.loads(response.text or "{}")
 
-            amount = float(data.get("amount", 0.0))
-            line_items = data.get("lineItems") or [
-                {"description": "Professional Services", "quantity": 1, "rate": amount, "amount": amount}
-            ]
+        amount = float(data.get("amount", 0.0))
+        line_items = data.get("lineItems") or [
+            {"description": "Professional Services", "quantity": 1, "rate": amount, "amount": amount}
+        ]
 
-            return {
-                "clientName": data.get("clientName", "Client"),
-                "clientEmail": data.get("clientEmail", "billing@client.com"),
-                "amount": amount,
-                "dueDate": data.get("dueDate", (datetime.now() + timedelta(days=14)).strftime("%Y-%m-%d")),
-                "notes": data.get("notes", f'Generated from prompt: "{prompt}"'),
-                "lineItems": line_items,
-            }
-        except Exception as err:
-            print(f"Gemini parse_invoice_prompt error: {err}")
-            return cls._mock_parsed_invoice(prompt)
+        return {
+            "clientName": data.get("clientName", "Client"),
+            "clientEmail": data.get("clientEmail", "billing@client.com"),
+            "amount": amount,
+            "dueDate": data.get("dueDate", (datetime.now() + timedelta(days=14)).strftime("%Y-%m-%d")),
+            "notes": data.get("notes", f'Generated from prompt: "{prompt}"'),
+            "lineItems": line_items,
+        }
 
     @classmethod
     async def generate_reminder_draft(
@@ -76,8 +65,6 @@ class GeminiService:
         payment_link: str = "https://sandbox.paypal.com/checkout",
     ) -> Dict[str, str]:
         client = cls._get_client()
-        if not client:
-            return cls._mock_reminder_draft(client_name, invoice_number, amount, days_late, tone, payment_link)
 
         prompt = (
             f"You are an AI receivables manager for SettleAI.\n"
@@ -91,88 +78,44 @@ class GeminiService:
             f"Return JSON strictly with 'subject' and 'message' keys."
         )
 
+        response = await asyncio.to_thread(
+            client.models.generate_content,
+            model=settings.GEMINI_MODEL,
+            contents=prompt,
+            config={"response_mime_type": "application/json"},
+        )
+        data = json.loads(response.text or "{}")
+        return {
+            "subject": data.get("subject", f"Payment Reminder: Invoice {invoice_number} (${amount:,.2f})"),
+            "message": data.get("message", f"Hi {client_name},\n\nPlease settle invoice {invoice_number} via: {payment_link}"),
+        }
+
+    @classmethod
+    async def generate_cash_flow_insight(cls, data: Dict[str, Any]) -> str:
+        overdue = data.get("overdue", 0)
+        expected = data.get("expected", 0)
         try:
-            response = await asyncio.to_thread(
-                client.models.generate_content,
-                model=settings.GEMINI_MODEL,
-                contents=prompt,
-                config={"response_mime_type": "application/json"},
+            client = cls._get_client()
+            prompt = (
+                f"You are a financial advisor for SettleAI. Generate a concise 1-2 sentence cash flow insight summary for the user's dashboard based on these numbers:\n"
+                f"- Total Received: ${data.get('received', 0):,.2f}\n"
+                f"- Expected / Sent: ${expected:,.2f}\n"
+                f"- Overdue: ${overdue:,.2f}\n"
+                f"- Overdue Invoices Count: {data.get('overdueInvoicesCount', 0)}\n"
+                f"- Top Overdue Client: {data.get('topOverdueClient') or 'None'} (${data.get('topOverdueAmount', 0):,.2f})\n"
+                f"Provide only plain text summary insight, no quotes or markdown headers."
             )
-            data = json.loads(response.text or "{}")
-            return {
-                "subject": data.get("subject", f"Payment Reminder: Invoice {invoice_number} (${amount:,.2f})"),
-                "message": data.get("message", f"Hi {client_name},\n\nPlease settle invoice {invoice_number} via: {payment_link}"),
-            }
-        except Exception as err:
-            print(f"Gemini generate_reminder_draft error: {err}")
-            return cls._mock_reminder_draft(client_name, invoice_number, amount, days_late, tone, payment_link)
-
-    @classmethod
-    def _mock_parsed_invoice(cls, prompt: str) -> Dict[str, Any]:
-        amount_match = re.search(r"\$?(\d+(?:,\d{3})*(?:\.\d{2})?)", prompt)
-        amount = float(amount_match.group(1).replace(",", "")) if amount_match else 1200.0
-
-        client = "Acme Corp"
-        if "nova" in prompt.lower():
-            client = "Nova Studio"
-        elif "stripe" in prompt.lower():
-            client = "Stripe Devs"
-        elif "pixel" in prompt.lower():
-            client = "Pixel Craft"
-
-        due_date = (datetime.now() + timedelta(days=14)).strftime("%Y-%m-%d")
-
-        return {
-            "clientName": client,
-            "clientEmail": f"billing@{client.lower().replace(' ', '')}.com",
-            "amount": amount,
-            "dueDate": due_date,
-            "notes": f'Generated from prompt: "{prompt}"',
-            "lineItems": [
-                {
-                    "description": prompt[:50] + "..." if len(prompt) > 50 else prompt,
-                    "quantity": 1,
-                    "rate": amount,
-                    "amount": amount,
-                }
-            ],
-        }
-
-    @classmethod
-    def _mock_reminder_draft(
-        cls,
-        client_name: str,
-        invoice_number: str,
-        amount: float,
-        days_late: int,
-        tone: str,
-        payment_link: str,
-    ) -> Dict[str, str]:
-        if tone == "friendly":
-            return {
-                "subject": f"Friendly Reminder: Invoice {invoice_number} (${amount:,.2f})",
-                "message": (
-                    f"Hi {client_name},\n\n"
-                    f"Hope your week is going great! Just following up on invoice {invoice_number} (${amount:,.2f}). "
-                    f"You can conveniently settle in seconds using the PayPal link below:\n\n{payment_link}\n\n"
-                    f"Let us know if you have any questions!"
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    client.models.generate_content,
+                    model=settings.GEMINI_MODEL,
+                    contents=prompt,
                 ),
-            }
-        elif tone == "final":
-            return {
-                "subject": f"URGENT / FINAL NOTICE: Overdue Invoice {invoice_number} (${amount:,.2f})",
-                "message": (
-                    f"Dear {client_name},\n\n"
-                    f"Invoice {invoice_number} for ${amount:,.2f} is now {days_late} days past due. "
-                    f"Immediate payment is required to avoid project suspension:\n\n{payment_link}\n\n"
-                    f"Please settle today."
-                ),
-            }
-        return {
-            "subject": f"Action Required: Overdue Invoice {invoice_number} (${amount:,.2f})",
-            "message": (
-                f"Hello {client_name},\n\n"
-                f"This is a quick notice that invoice {invoice_number} (${amount:,.2f}) is now {days_late} days past due. "
-                f"Please settle via the PayPal link below:\n\n{payment_link}\n\nThank you for your prompt cooperation."
-            ),
-        }
+                timeout=5.0,
+            )
+            return response.text.strip()
+        except Exception as e:
+            print(f"Gemini cash flow insight notice: {e}")
+            if overdue > 0:
+                return f"${overdue:,.2f} is currently overdue across {data.get('overdueInvoicesCount', 0)} invoices. Follow up to keep cash flow healthy."
+            return f"${expected:,.2f} expected in upcoming payments. All current invoices are on schedule."

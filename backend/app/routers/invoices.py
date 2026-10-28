@@ -21,9 +21,14 @@ async def list_invoices(
 async def create_invoice(payload: CreateInvoiceSchema):
     try:
         invoice = await InvoiceService.create_invoice(payload.userId or "user-default", payload)
+        msg = (
+            "Invoice saved as draft"
+            if invoice.get("status") == "draft"
+            else "Invoice created and sent via PayPal"
+        )
         return {
             "success": True,
-            "message": "Invoice created successfully with PayPal Orders v2 checkout link",
+            "message": msg,
             "invoice": invoice,
         }
     except Exception as e:

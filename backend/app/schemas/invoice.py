@@ -17,6 +17,7 @@ class CreateInvoiceSchema(BaseModel):
     lineItems: List[LineItemSchema] = Field(..., min_items=1)
     notes: Optional[str] = None
     userId: Optional[str] = "user-default"
+    status: Optional[Literal["draft", "sent", "paid", "overdue", "cancelled"]] = "draft"
 
 class UpdateInvoiceSchema(BaseModel):
     clientName: Optional[str] = None

@@ -1,22 +1,96 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import Image from "next/image";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
 
 export default function KeyBenefits() {
+  const rootRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    gsap.registerPlugin(ScrollTrigger);
+
+    const ctx = gsap.context(() => {
+      // Title reveal
+      gsap.from(".kb-title", {
+        y: 40,
+        opacity: 0,
+        duration: 0.8,
+        ease: "power3.out",
+        scrollTrigger: {
+          trigger: rootRef.current,
+          start: "top 80%",
+          once: true,
+        },
+      });
+
+      // Top 3 cards staggered entrance
+      gsap.from(".kb-card-top", {
+        y: 60,
+        opacity: 0,
+        duration: 0.85,
+        stagger: 0.15,
+        ease: "power3.out",
+        scrollTrigger: {
+          trigger: ".kb-grid-top",
+          start: "top 80%",
+          once: true,
+        },
+      });
+
+      // Bottom 2 cards staggered entrance
+      gsap.from(".kb-card-bottom", {
+        y: 60,
+        opacity: 0,
+        duration: 0.85,
+        stagger: 0.2,
+        ease: "power3.out",
+        scrollTrigger: {
+          trigger: ".kb-grid-bottom",
+          start: "top 80%",
+          once: true,
+        },
+      });
+
+      // Floating invoice tags in card 1
+      gsap.to(".kb-float-tag-1", {
+        y: -8,
+        rotate: 14,
+        duration: 2.8,
+        repeat: -1,
+        yoyo: true,
+        ease: "sine.inOut",
+      });
+
+      gsap.to(".kb-float-tag-2", {
+        y: 8,
+        rotate: -10,
+        duration: 3.2,
+        repeat: -1,
+        yoyo: true,
+        ease: "sine.inOut",
+      });
+    }, rootRef);
+
+    return () => ctx.revert();
+  }, []);
+
   return (
-    <section id="key-benefits" className="max-w-7xl mx-auto px-4 sm:px-6 ">
+    <section ref={rootRef} id="key-benefits" className="max-w-7xl mx-auto px-4 sm:px-6">
+      
       <div className="text-center mb-14 sm:mb-16">
-        <h2 className="text-4xl sm:text-5xl font-bold tracking-tight text-slate-900">
+        <h2 className="kb-title text-4xl sm:text-5xl font-bold tracking-tight text-slate-900">
           Key benefits
         </h2>
       </div>
 
       <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white rounded-[32px] p-7 sm:p-8 flex flex-col justify-between border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_36px_rgba(0,0,0,0.08)] transition-all duration-300 min-h-[420px] overflow-hidden group">
+        <div className="kb-grid-top grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="kb-card-top bg-white rounded-[32px] p-7 sm:p-8 flex flex-col justify-between border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_36px_rgba(0,0,0,0.08)] transition-all duration-300 min-h-[420px] overflow-hidden group">
             <div className="relative h-44 w-full flex items-center justify-center">
-              <div className="absolute w-40 bg-slate-900 text-white rounded-2xl p-4 shadow-xl rotate-[12deg] translate-x-6 -translate-y-2 group-hover:rotate-[16deg] group-hover:translate-x-8 transition-transform duration-300 border border-slate-800">
+              <div className="kb-float-tag-1 absolute w-40 bg-slate-900 text-white rounded-2xl p-4 shadow-xl rotate-[12deg] translate-x-6 -translate-y-2 group-hover:rotate-[16deg] group-hover:translate-x-8 transition-transform duration-300 border border-slate-800">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs">
                     ✓
@@ -27,7 +101,7 @@ export default function KeyBenefits() {
                 <div className="text-lg font-bold text-white mt-0.5">+£385.00</div>
               </div>
 
-              <div className="absolute w-40 bg-white text-slate-900 rounded-2xl p-4 shadow-2xl rotate-[-8deg] -translate-x-6 translate-y-1 group-hover:rotate-[-12deg] group-hover:-translate-x-8 transition-transform duration-300 border border-slate-100">
+              <div className="kb-float-tag-2 absolute w-40 bg-white text-slate-900 rounded-2xl p-4 shadow-2xl rotate-[-8deg] -translate-x-6 translate-y-1 group-hover:rotate-[-12deg] group-hover:-translate-x-8 transition-transform duration-300 border border-slate-100">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-6 h-6 rounded-lg bg-[#00c2ff]/15 text-[#00a3d9] flex items-center justify-center text-xs font-bold">
                     <Image src="/star.svg" alt="arrow" width={20} height={20} />
@@ -49,7 +123,7 @@ export default function KeyBenefits() {
             </div>
           </div>
 
-          <div className="bg-white rounded-[32px] p-7 sm:p-8 flex flex-col justify-between border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_36px_rgba(0,0,0,0.08)] transition-all duration-300 min-h-[420px] overflow-hidden group">
+          <div className="kb-card-top bg-white rounded-[32px] p-7 sm:p-8 flex flex-col justify-between border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_36px_rgba(0,0,0,0.08)] transition-all duration-300 min-h-[420px] overflow-hidden group">
             <div className="text-center">
               <h3 className="text-xl font-bold text-slate-900 tracking-tight">
                 Your invoice, in your client’s inbox in seconds
@@ -87,7 +161,7 @@ export default function KeyBenefits() {
             </div>
           </div>
 
-          <div className="bg-white rounded-[32px] p-7 sm:p-8 flex flex-col justify-between border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_36px_rgba(0,0,0,0.08)] transition-all duration-300 min-h-[420px] overflow-hidden group">
+          <div className="kb-card-top bg-white rounded-[32px] p-7 sm:p-8 flex flex-col justify-between border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_36px_rgba(0,0,0,0.08)] transition-all duration-300 min-h-[420px] overflow-hidden group">
             <div className="text-center">
               <h3 className="text-xl font-bold text-slate-900 tracking-tight">
                 Awkward follow-ups, handled
@@ -132,8 +206,8 @@ export default function KeyBenefits() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-5 bg-white rounded-[32px] p-8 sm:p-9 border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_36px_rgba(0,0,0,0.08)] transition-all duration-300 flex flex-col justify-between overflow-hidden group">
+        <div className="kb-grid-bottom grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="kb-card-bottom lg:col-span-5 bg-white rounded-[32px] p-8 sm:p-9 border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_36px_rgba(0,0,0,0.08)] transition-all duration-300 flex flex-col justify-between overflow-hidden group">
             <div>
               <h3 className="text-2xl font-bold text-slate-900 tracking-tight">
                 The right tone, every time
@@ -181,7 +255,7 @@ export default function KeyBenefits() {
             </div>
           </div>
 
-          <div className="lg:col-span-7 bg-[#0B0F19] text-white rounded-[32px] p-8 sm:p-9 border border-slate-800 shadow-2xl hover:shadow-[0_20px_50px_rgba(0,194,255,0.1)] transition-all duration-300 flex flex-col justify-between overflow-hidden group">
+          <div className="kb-card-bottom lg:col-span-7 bg-[#0B0F19] text-white rounded-[32px] p-8 sm:p-9 border border-slate-800 shadow-2xl hover:shadow-[0_20px_50px_rgba(0,194,255,0.1)] transition-all duration-300 flex flex-col justify-between overflow-hidden group">
             <div>
               <h3 className="text-2xl font-bold text-white tracking-tight">
                 One-click chasing

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -23,7 +24,7 @@ type LineItem = {
   rate: number;
 };
 
-type InvoiceStatus = "draft" | "pending_approval";
+type InvoiceStatus = "draft" | "sent";
 
 // The id is passed in for the initial item so the server and client agree on it.
 // Event handlers call this with no argument and get a fresh random UUID.
@@ -35,6 +36,173 @@ const createLineItem = (id: string = crypto.randomUUID()): LineItem => ({
 });
 
 const pad = (n: number) => String(n).padStart(2, "0");
+
+const money = (amount: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(amount);
+
+// Replace with the signed-in user's business details when you have them.
+const BUSINESS = {
+  initials: "NS",
+  name: "Northstar Studio",
+  lines: ["12 Harbour Lane, Dubai", "hello@northstar.studio"],
+};
+
+// Fixed bar widths so the barcode is identical on server and client.
+const BARS = [
+  2, 1, 3, 1, 1, 2, 3, 1, 2, 1, 1, 3, 2, 1, 1, 2, 1, 3, 1, 2, 2, 1, 3, 1, 1, 2,
+  1, 1, 3, 2, 1, 2, 1, 3, 1, 1, 2, 3, 1, 2, 1, 1, 2, 3, 1, 1, 2, 1, 3, 2,
+];
+
+const formatDate = (d: string) =>
+  d
+    ? new Date(`${d}T00:00:00`).toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
+    : "—";
+
+function Leader({
+  label,
+  value,
+  bold,
+}: {
+  label: ReactNode;
+  value: ReactNode;
+  bold?: boolean;
+}) {
+  return (
+    <div className="flex items-baseline gap-2">
+      <span className="shrink-0">{label}</span>
+      <span className="flex-1 border-b border-dotted border-slate-300" />
+      <span className={`shrink-0 ${bold ? "font-bold" : ""}`}>{value}</span>
+    </div>
+  );
+}
+
+function Divider() {
+  return <div className="my-5 border-t border-dashed border-slate-300" />;
+}
+
+// Receipt-style invoice. Used in the sidebar summary and in the review modal.
+function InvoiceReceipt({
+  invoiceNumber,
+  issueDate,
+  dueDate,
+  clientName,
+  clientEmail,
+  lineItems,
+  subtotal,
+  notes,
+}: {
+  invoiceNumber: string;
+  issueDate: string;
+  dueDate: string;
+  clientName: string;
+  clientEmail: string;
+  lineItems: LineItem[];
+  subtotal: number;
+  notes: string;
+}) {
+  return (
+    <div className="rounded-sm border border-gray-200 bg-white px-6 py-8 font-mono text-[11px] leading-5 text-slate-900 shadow-sm">
+      {/* Business header */}
+      <div className="flex flex-col items-center text-center">
+        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#0b0f19] text-[11px] font-bold text-white">
+          {BUSINESS.initials}
+        </div>
+        <p className="mt-4 text-sm font-bold uppercase tracking-[0.25em]">
+          {BUSINESS.name}
+        </p>
+        <div className="mt-3 text-[10px] text-slate-500">
+          {BUSINESS.lines.map((l) => (
+            <p key={l}>{l}</p>
+          ))}
+        </div>
+      </div>
+
+      <Divider />
+
+      {/* Title + meta */}
+      <h3 className="text-center text-xl font-bold uppercase tracking-[0.4em]">
+        Invoice
+      </h3>
+      <div className="mt-5 space-y-1.5">
+        <Leader label="No." value={invoiceNumber || "—"} />
+        <Leader label="Date" value={formatDate(issueDate)} />
+        <Leader label="Due" value={formatDate(dueDate)} />
+      </div>
+
+      <Divider />
+
+      {/* Bill to */}
+      <p className="text-[9px] uppercase tracking-[0.2em] text-slate-400">
+        Bill to
+      </p>
+      <p className="mt-2 text-xs font-bold">{clientName || "Not added"}</p>
+      <p className="mt-1 break-all text-[10px] text-slate-500">
+        {clientEmail || "No email"}
+      </p>
+
+      <Divider />
+
+      {/* Line items */}
+      <div className="space-y-4">
+        {lineItems.map((item) => (
+          <div key={item.id}>
+            <p className="font-bold">{item.description || "Untitled item"}</p>
+            <Leader
+              label={`${item.quantity} × ${money(item.rate)}`}
+              value={money(item.quantity * item.rate)}
+            />
+          </div>
+        ))}
+      </div>
+
+      <Divider />
+
+      {/* Totals */}
+      <div className="space-y-1.5">
+        <Leader
+          label={<span className="uppercase">Subtotal</span>}
+          value={money(subtotal)}
+        />
+      </div>
+      <div className="mt-4 flex items-baseline justify-between border-y-2 border-[#0b0f19] py-3">
+        <span className="text-sm font-bold uppercase">Total</span>
+        <span className="text-xl font-bold">{money(subtotal)}</span>
+      </div>
+
+      {/* Notes */}
+      {notes && (
+        <>
+          <Divider />
+          <p className="text-[9px] uppercase tracking-[0.2em] text-slate-400">
+            Notes
+          </p>
+          <p className="mt-2 whitespace-pre-wrap text-[11px]">{notes}</p>
+        </>
+      )}
+
+      {/* Barcode */}
+      <div
+        className="mt-6 flex h-12 items-stretch justify-center gap-[2px]"
+        aria-hidden="true"
+      >
+        {BARS.map((w, i) => (
+          <span
+            key={i}
+            className={i % 2 === 0 ? "bg-[#0b0f19]" : "bg-transparent"}
+            style={{ width: w * 1.5 }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function NewInvoicePage() {
   const router = useRouter();
@@ -75,12 +243,6 @@ export default function NewInvoicePage() {
       ),
     [lineItems]
   );
-
-  const money = (amount: number) =>
-    new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(amount);
 
   const updateLineItem = (
     id: string,
@@ -196,6 +358,7 @@ export default function NewInvoicePage() {
         clientEmail: clientEmail.trim(),
         dueDate,
         notes,
+        status,
         amount: subtotal,
         lineItems: lineItems.map((it) => ({
           description: it.description,
@@ -205,7 +368,11 @@ export default function NewInvoicePage() {
         })),
       });
 
-      setMessage(`Invoice ${created.invoiceNumber} saved.`);
+      setMessage(
+        status === "draft"
+          ? `Invoice ${created.invoiceNumber} saved as draft.`
+          : `Invoice ${created.invoiceNumber} created and sent via PayPal to ${clientEmail.trim()}!`
+      );
       setShowPreview(false);
       setTimeout(() => {
         router.push("/dashboard/invoices");
@@ -218,6 +385,17 @@ export default function NewInvoicePage() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const receiptProps = {
+    invoiceNumber,
+    issueDate,
+    dueDate,
+    clientName,
+    clientEmail,
+    lineItems,
+    subtotal,
+    notes,
   };
 
   return (
@@ -563,34 +741,7 @@ export default function NewInvoicePage() {
           </div>
 
           <aside className="space-y-4 lg:sticky lg:top-6">
-            <div className="rounded-2xl bg-[#00d2ff] p-5 text-slate-950">
-              <div className="mb-6 flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-widest">
-                  Invoice summary
-                </span>
-                <FileText size={20} />
-              </div>
-
-              <p className="text-sm text-slate-800">Total invoice amount</p>
-              <p className="mt-2 text-3xl font-bold">{money(subtotal)}</p>
-
-              <div className="mt-6 space-y-3 border-t border-black/10 pt-4 text-sm">
-                <div className="flex justify-between gap-3">
-                  <span>Client</span>
-                  <span className="max-w-[60%] truncate font-semibold">
-                    {clientName || "Not added"}
-                  </span>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <span>Items</span>
-                  <span className="font-semibold">{lineItems.length}</span>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <span>Due date</span>
-                  <span className="font-semibold">{dueDate || "Not set"}</span>
-                </div>
-              </div>
-            </div>
+            <InvoiceReceipt {...receiptProps} />
 
             <div className="rounded-2xl border border-[#0b0f19] bg-[#0b0f19] p-5">
               <h3 className="font-bold text-white">Before you send</h3>
@@ -617,95 +768,55 @@ export default function NewInvoicePage() {
 
       {showPreview && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/50 p-4"
+          className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="preview-title"
         >
-          <div className="my-auto w-full max-w-xl rounded-2xl bg-[#fffdf6] p-6 shadow-2xl sm:p-8">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-                  Final review
-                </p>
-                <h2 id="preview-title" className="mt-2 text-2xl font-bold">
-                  Invoice preview
-                </h2>
-              </div>
+          <div className="mx-auto my-6 w-full max-w-md">
+            <div className="mb-3 flex items-center justify-between text-white">
+              <h2
+                id="preview-title"
+                className="text-xs font-semibold uppercase tracking-widest"
+              >
+                Final review
+              </h2>
               <button
                 type="button"
                 onClick={() => setShowPreview(false)}
-                className="rounded-lg px-3 py-1 text-2xl text-slate-500 hover:bg-slate-100"
+                className="rounded-lg px-3 py-1 text-2xl leading-none hover:bg-white/10"
                 aria-label="Close preview"
               >
                 ×
               </button>
             </div>
 
-            <div className="mt-6 space-y-4">
-              <div className="rounded-xl border border-gray-300 p-4">
-                <p className="font-bold">{invoiceNumber}</p>
-                <p className="mt-2">{clientName}</p>
-                <p className="text-sm text-slate-500">{clientEmail}</p>
-                <p className="mt-3 text-sm text-slate-500">
-                  Issued: {issueDate} · Due: {dueDate}
-                </p>
+            <InvoiceReceipt {...receiptProps} />
+
+            <div className="mt-4 rounded-2xl bg-white p-4">
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  disabled={isSaving}
+                  onClick={() => saveInvoice("draft")}
+                  className="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold hover:bg-slate-50 disabled:opacity-60"
+                >
+                  {isSaving ? "Saving..." : "Save as draft"}
+                </button>
+                <button
+                  type="button"
+                  disabled={isSaving}
+                  onClick={() => saveInvoice("sent")}
+                  className="flex-1 rounded-xl bg-[#0b0f19] px-4 py-3 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
+                >
+                  {isSaving ? "Sending..." : "Approve & Send via PayPal"}
+                </button>
               </div>
 
-              <div className="space-y-3">
-                {lineItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex justify-between gap-4 border-b border-gray-300 pb-3 text-sm"
-                  >
-                    <div>
-                      <p className="font-semibold">{item.description}</p>
-                      <p className="mt-1 text-slate-500">
-                        {item.quantity} × {money(item.rate)}
-                      </p>
-                    </div>
-                    <p className="shrink-0 font-semibold">
-                      {money(item.quantity * item.rate)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex justify-between text-xl font-bold">
-                <span>Total</span>
-                <span>{money(subtotal)}</span>
-              </div>
-
-              {notes && (
-                <p className="whitespace-pre-wrap text-sm text-slate-500">
-                  {notes}
-                </p>
-              )}
+              <p className="mt-3 text-xs leading-5 text-slate-500">
+                “Approve & Send” generates a real PayPal invoice and emails it directly to your client with a PayPal checkout link.
+              </p>
             </div>
-
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-              <button
-                type="button"
-                disabled={isSaving}
-                onClick={() => saveInvoice("draft")}
-                className="flex-1 rounded-xl border border-[#ded6c3] px-4 py-3 text-sm font-semibold hover:bg-[#f7f3e6] disabled:opacity-60"
-              >
-                {isSaving ? "Saving..." : "Save as draft"}
-              </button>
-              <button
-                type="button"
-                disabled={isSaving}
-                onClick={() => saveInvoice("pending_approval")}
-                className="flex-1 rounded-xl bg-[#202020] px-4 py-3 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
-              >
-                {isSaving ? "Saving..." : "Approve & continue"}
-              </button>
-            </div>
-
-            <p className="mt-3 text-xs leading-5 text-slate-500">
-              Approve & continue saves the invoice for approval only. It does
-              not email the client or create a payment link.
-            </p>
           </div>
         </div>
       )}

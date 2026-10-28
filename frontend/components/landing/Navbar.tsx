@@ -114,7 +114,7 @@ export default function Navbar() {
   };
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 bg-white/60 backdrop-blur-md border-b border-slate-100">
+    <header className="fixed inset-x-0 top-0 z-50 bg-white/60 backdrop-blur-md ">
       <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link
@@ -176,9 +176,8 @@ export default function Navbar() {
                   </span>
                   <ChevronDown
                     size={13}
-                    className={`text-slate-400 transition-transform duration-200 ${
-                      showUserMenu ? "rotate-180" : ""
-                    }`}
+                    className={`text-slate-400 transition-transform duration-200 ${showUserMenu ? "rotate-180" : ""
+                      }`}
                   />
                 </button>
 

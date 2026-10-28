@@ -24,8 +24,7 @@ export default function CtaBanner() {
         .from(".cta-sub", { y: 20, opacity: 0, duration: 0.6 }, "-=0.4")
         .from(".cta-arrow", { clipPath: "inset(0 100% 0 0)", duration: 0.9, ease: "power2.inOut" }, "-=0.2")
         .from(".cta-btn", { scale: 0.6, opacity: 0, duration: 0.5, ease: "back.out(2)" }, "-=0.3")
-        .from(".cta-mark", { yPercent: 60, opacity: 0, duration: 1.1, ease: "power4.out" }, "-=0.9")
-        .from(".cta-chip", { scale: 0.6, opacity: 0, duration: 0.6, stagger: 0.2, ease: "back.out(2)" }, "-=0.6");
+        .from(".cta-mark", { yPercent: 60, opacity: 0, duration: 1.1, ease: "power4.out" }, "-=0.9");
 
 
       gsap.utils.toArray<HTMLElement>(".cta-blob").forEach((el) => {
@@ -89,7 +88,7 @@ export default function CtaBanner() {
               alt="arrow"
               width={100}
               height={100}
-              className="cta-arrow -mt-5 hidden sm:block"
+              className="cta-arrow -mt-5 hidden sm:block h-auto w-auto"
             />
             <div onMouseMove={onMove} onMouseLeave={onLeave} className="cta-btn relative">
               <span className="cta-ring pointer-events-none absolute inset-0 rounded-full border-2 border-white" />

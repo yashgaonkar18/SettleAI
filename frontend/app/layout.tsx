@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
-import { Google_Sans } from "next/font/google";
+import { Google_Sans, Geist } from "next/font/google";
 import "./globals.css";
+import { cn } from "@/lib/utils";
 
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 const googleSans = Google_Sans({
   variable: "--font-google-sans",
@@ -12,6 +14,9 @@ export const metadata: Metadata = {
   title: "Settle | Get Paid Instantly",
   description:
     "Create the invoice. Get paid. Chase it when it’s late, without the awkward emails.",
+  icons: {
+    icon: "/logo.ico",
+  }
 };
 
 export default function RootLayout({
@@ -22,7 +27,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${googleSans.variable} h-full antialiased`}
+      className={cn("h-full", "antialiased", googleSans.variable, "font-sans", geist.variable)}
     >
       <body
         suppressHydrationWarning

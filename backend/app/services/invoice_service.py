@@ -126,20 +126,32 @@ class InvoiceService:
 
         total_amount = data.amount if data.amount is not None else sum(item.quantity * item.rate for item in data.lineItems)
         invoice_number = data.invoiceNumber or f"INV-{datetime.now().year}-{random.randint(100, 999)}"
+        target_status = data.status if data.status in ["draft", "sent", "paid", "overdue", "cancelled"] else "draft"
 
-        try:
-            pp = await PayPalService.create_order(
-                invoice_number=invoice_number,
-                amount=total_amount,
-                client_email=data.clientEmail,
-                description=f"SettleAI invoice for {data.clientName}",
-            )
-            order_id = pp["orderId"]
-            payment_link = pp["approvalLink"]
-        except Exception as pp_err:
-            print(f"PayPal order creation fallback: {pp_err}")
-            order_id = f"ORD-{int(time.time())}"
-            payment_link = f"https://sandbox.paypal.com/checkout?token={order_id}"
+        # If target status is "sent", dispatch PayPal invoice immediately via email
+        send_now = (target_status == "sent")
+
+        pp = await PayPalService.create_invoice(
+            invoice_number=invoice_number,
+            amount=total_amount,
+            client_email=data.clientEmail,
+            client_name=data.clientName,
+            due_date=data.dueDate,
+            notes=data.notes,
+            line_items=[
+                {
+                    "description": it.description,
+                    "quantity": it.quantity,
+                    "rate": it.rate,
+                    "amount": it.amount or (it.quantity * it.rate),
+                }
+                for it in data.lineItems
+            ],
+            currency="USD",
+            send_to_recipient=send_now,
+        )
+        order_id = pp["invoiceId"]
+        payment_link = pp["paymentLink"]
 
         if not supabase_admin:
             raise ValueError("Database connection unavailable.")
@@ -152,7 +164,7 @@ class InvoiceService:
             "amount": total_amount,
             "due_date": data.dueDate,
             "notes": data.notes,
-            "status": "sent",
+            "status": target_status,
             "paypal_order_id": order_id,
             "payment_link": payment_link,
         }).execute()
@@ -196,6 +208,19 @@ class InvoiceService:
                 payload = {"status": status}
                 if status == "paid" and paid_amount is not None:
                     payload["paid_amount"] = paid_amount
+
+                # If transitioning from draft to sent, send the PayPal invoice if present
+                if status == "sent":
+                    try:
+                        inv = await cls.get_invoice_by_id(invoice_id)
+                        pp_id = inv.get("paypalOrderId") or inv.get("paypal_order_id")
+                        if pp_id and pp_id.startswith("INV2-"):
+                            send_res = await PayPalService.send_invoice(pp_id)
+                            if send_res.get("paymentLink"):
+                                payload["payment_link"] = send_res["paymentLink"]
+                    except Exception as err:
+                        print(f"PayPal send invoice on status change warning: {err}")
+
                 res = supabase_admin.from_("invoices").update(payload).eq("id", invoice_id).execute()
                 if res.data:
                     return res.data[0]
